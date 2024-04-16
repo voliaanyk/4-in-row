@@ -3,6 +3,7 @@ import minimax_agent
 import copy
 import random
 import math
+import numpy as np
 
 class Game():
     def __init__(self, num_rows, num_cols, inrow, player):
@@ -12,7 +13,7 @@ class Game():
         self.player = player
 
 class State():
-    def __init__(self, board, game, parent, player):
+    def __init__(self, board, game, parent, player, heights = []):
         self.board = board
         self.rules = game
         self.parent = parent
@@ -23,6 +24,16 @@ class State():
         self.total_score = 0
         self.visited = 0
         self.move = -1
+        self.heights = heights
+        if len(heights)==0:
+            self.calculateHeights()
+
+    def calculateHeights(self):
+        for j in range(self.rules.cols):
+            row = 0
+            while row+1<self.rules.rows and self.board[row+1][j]==0:
+                row+=1
+            self.heights.append(row)
 
     def possibleMoves(self):
         moves = []
@@ -48,10 +59,13 @@ class State():
             #print(f'Column {col} is full, unable to make the move')
             return
         self.move = col
-        row = 0
-        while row+1<self.rules.rows and self.board[row+1][col] == 0:
-            row+=1
+        row = self.heights[col]
         self.board[row][col] = player
+        self.heights[col] -=1
+    
+    def undoMove(self, col):
+        self.heights[col] += 1
+        self.board[self.heights[col]][col] = 0
     
     def findTerminateState(self):
         new_board = copy.deepcopy(self)
@@ -63,13 +77,32 @@ class State():
                 #print(new_board.board)
                 #print(value)
                 return value
-            moves = new_board.possibleMoves()
-            random_move = random.randint(0, len(moves)-1)
-            new_board.simulateMove(moves[random_move], player)
+            
+            #moves = new_board.possibleMoves()
+            #random_move = random.randint(0, len(moves)-1)
+            #new_board.simulateMove(moves[random_move], player)
+            cols = new_board.possibleMoves()
+            values = []
+            for col in cols:
+                new_board.simulateMove(col, player)
+                val = minimax_agent.calc_value_2(new_board.board, self.rules.cols, self.rules.rows, self.rules.inrow, player)
+                values.append(val)
+                new_board.undoMove(col)
+            min_value = min(values)
+            if min_value<=0:
+                values = [v-min_value + 1 for v in values]
+            sum = 0
+            for v in values:    sum+=v
+            probabilities = [v/sum for v in values]
+            x = np.random.choice(len(values), p=probabilities)
+            #print(f'chose column {cols[x]} for player {player}')
+            new_board.simulateMove(cols[x], player)
+            #move = minimax_agent.one_move_lookahead(new_board.board, self.rules.cols, self.rules.rows, self.rules.inrow, player=player)
+            #new_board.simulateMove(move, player)
             player = 3 - player
     
     def createChild(self, move):
-        childState = State(copy.deepcopy(self.board), self.rules, self, 3-self.player)
+        childState = State(copy.deepcopy(self.board), self.rules, self, 3-self.player, copy.deepcopy(self.heights))
         childState.simulateMove(move, self.player)
 
         self.children.append(childState)
@@ -86,10 +119,10 @@ class State():
             self.createChild(move)
         return True
 
-    def getValue(self, c = math.sqrt(2)):
+    def getValue(self, iteration, c = 1):
         if self.visited==0:
             return float('inf')
-        return self.total_score*1.0/self.visited + c*math.sqrt((math.log(self.parent.visited))/self.visited)
+        return self.total_score*1.0/self.visited + c*math.sqrt((math.log(iteration))/self.visited)
 
     def getAverageScore(self):
         if self.visited==0:
@@ -104,14 +137,14 @@ class MCTree():
     def __init__(self, root_board, game):
         self.root = State(root_board, game, -1, game.player)
 
-    def selectChild(self, state):
+    def selectChild(self, state, it):
         #print("selecting a child")
         if state.isLeaf():
             return None
         max_value = 0
         best_node = []
         for child in state.children:
-            value = child.getValue()
+            value = child.getValue(it)
             #print(f"child {child.move} has value {value}, {math.isinf(value)}")
             if value>max_value:
                 max_value = value
@@ -123,15 +156,15 @@ class MCTree():
         return best_node[x]
 
 
-    def selectLeaf(self):
+    def selectLeaf(self, it):
         state = self.root
         while not state.isLeaf():
-            state = self.selectChild(state)
+            state = self.selectChild(state, it)
         return state
 
     def expandLeaf(self, leaf):
         if leaf.expand():
-            return self.selectChild(leaf)
+            return self.selectChild(leaf, 0)
         return leaf
 
 
@@ -144,9 +177,9 @@ class MCTree():
         self.update(node.parent, value)
         
 
-    def iteration(self):
+    def iteration(self, it):
         #selection
-        leaf = self.selectLeaf()
+        leaf = self.selectLeaf(it)
         #print(f'selected leaf {leaf.move}')
         #expansion
         child = self.expandLeaf(leaf)
@@ -158,9 +191,10 @@ class MCTree():
 
     
     def runSimulation(self, iterations = 100):
-        for _ in range(iterations):
-            #print(f'iteration {_}')
-            self.iteration()
+        for iteration in range(iterations):
+            #print(f'iteration {iteration}')
+            self.iteration(iteration)
+            #print()
         
     
     def getBestMove(self):

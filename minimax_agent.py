@@ -87,6 +87,18 @@ def drop(board, col, num_rows, player):
     board[row][col] = player
     return board
 
+def calc_value_2(board, num_cols, num_rows, inrow, player):
+    p_4 = count_inrow(board, num_cols, num_rows, inrow, inrow, 3-player)
+    p_3 = count_inrow(board, num_cols, num_rows, inrow, inrow-1, 3-player)
+    p_2 = count_inrow(board, num_cols, num_rows, inrow, inrow-2, 3-player)
+
+    a_4 = count_inrow(board, num_cols, num_rows, inrow, inrow, player)
+    a_3 = count_inrow(board, num_cols, num_rows, inrow, inrow-1, player)
+    a_2 = count_inrow(board, num_cols, num_rows, inrow, inrow-2, player)
+
+    value = 1e8*a_4 + 1e4*a_3 + 1*a_2 - 1e2*p_2 - 1e6*p_3 - 1e10*p_4
+    return value
+
 #calculates the value of the board for a player
 def calc_value(board, num_cols, num_rows, inrow, player):
     p_4 = count_inrow(board, num_cols, num_rows, inrow, inrow, 3-player)
@@ -109,15 +121,15 @@ def possible_moves(board, num_cols):
     return cols
 
 #a function that tries to drop a piece down every possible column and chooses the resulting board of the best value
-def one_move_lookahead(board, num_cols, num_rows, inrow):
+def one_move_lookahead(board, num_cols, num_rows, inrow, player=2):
     cols = possible_moves(board, num_cols)
     max_value = -1000000
     best_cols = [cols[0]]
     for col in cols:
         #print(f'\n\n\n\n\n col: {col}')
-        new_board = drop(copy.deepcopy(board), col, num_rows, 2)
+        new_board = drop(copy.deepcopy(board), col, num_rows, player)
         #print(new_board)
-        value = calc_value(new_board, num_cols, num_rows, inrow, 2)
+        value = calc_value(new_board, num_cols, num_rows, inrow, player)
 
         if value > max_value:
             max_value = value
@@ -220,17 +232,17 @@ def n_moves_lookahead(board, num_cols, num_rows, inrow, n=5):
     x = randint(0, len(best_move)-1)
     return best_move[x]
 
-def n_moves_lookahead_alpha_beta(board, num_cols, num_rows, inrow, n=4):
-    best_score, best_move = minimax_alpha_beta(board, num_cols, num_rows, inrow, n, 2, float('-inf'), float('inf'))
+def n_moves_lookahead_alpha_beta(board, num_cols, num_rows, inrow, player, n=4):
+    best_score, best_move = minimax_alpha_beta(board, num_cols, num_rows, inrow, n, player, float('-inf'), float('inf'))
     x = randint(0, len(best_move)-1)
     return best_move[x]
 
 
     
 
-def move(board, num_cols, num_rows, inrow):
+def move(board, num_cols, num_rows, inrow, player=2, depth=4):
     #return random_move(board, num_cols, num_rows, inrow)
     #return one_move_lookahead(board, num_cols, num_rows, inrow)
     #return n_moves_lookahead(board, num_cols, num_rows, inrow)
-    return n_moves_lookahead_alpha_beta(board, num_cols, num_rows, inrow)
+    return n_moves_lookahead_alpha_beta(board, num_cols, num_rows, inrow, player, n = depth)
     
