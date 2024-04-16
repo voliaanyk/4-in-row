@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template, jsonify
-import agent
+import minimax_agent
+import mcts_agent
 
 
 app = Flask(__name__)
@@ -16,8 +17,11 @@ def agentMakeMove():
     num_rows = data['num_rows']
     inrow = data['inrow']
 
+    #move = minimax_agent.move(board, num_cols, num_rows, inrow)
+    move = mcts_agent.move(board, num_cols, num_rows, inrow)
+
     return jsonify({
-        "move": agent.move(board, num_cols, num_rows, inrow)
+        "move": move
     })
     
 
